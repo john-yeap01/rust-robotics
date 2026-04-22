@@ -1,0 +1,12 @@
+[package]
+name = "rust_robots"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+debug_visuals = []
+
+[dependencies]
+bevy = "0.18.1"
+bevy_rapier2d = { version = "0.33.0", features = ["debug-render-2d"] }
