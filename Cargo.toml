@@ -9,4 +9,4 @@ debug_visuals = []
 
 [dependencies]
 bevy = "0.18.1"
-bevy_rapier2d = { version = "0.33.0", features = ["debug-render-2d"] }
+avian2d = "0.6"

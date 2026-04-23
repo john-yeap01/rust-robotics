@@ -1,25 +1,58 @@
+use avian2d::prelude::*;
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 
 #[derive(Component, Debug, Default)]
 pub struct Robot;
+
+#[derive(Component, Debug, Default)]
+pub struct Link;
+
+#[derive(Component, Debug, Default)]
+pub struct Joint;
 
 pub fn spawn_default_robot(commands: &mut Commands, position: Vec2) -> Entity {
     commands
         .spawn((
             Robot,
             RigidBody::Dynamic,
-            Collider::ball(50.0),
-            Restitution::coefficient(1.2),
+            Collider::circle(50.0),
+            Restitution::new(0.8),
             Transform::from_xyz(position.x, position.y, 0.0),
         ))
         .id()
 }
 
-// pub fn add_joint(commands: &mut Commands, position)
+pub fn add_link(commands: &mut Commands, position: Vec2, is_base: bool) -> Entity {
+    if is_base {
+        commands
+            .spawn((
+                Link,
+                RigidBody::Static,
+                Collider::rectangle(20.0, 100.0),
+                Restitution::ZERO,
+                Transform::from_xyz(position.x, position.y, 0.0),
+            ))
+            .id()
+    } else {
+        commands
+            .spawn((
+                Link,
+                RigidBody::Dynamic,
+                Collider::rectangle(20.0, 100.0),
+                Restitution::ZERO,
+                Transform::from_xyz(position.x, position.y, 0.0),
+            ))
+            .id()
+    }
+}
 
-pub fn add_link(commands: &mut Commands, position: Vec2) {
-
+pub fn attach_link(commands: &mut Commands, parent: Entity, child: Entity) {
+    commands.spawn((
+        Joint,
+        RevoluteJoint::new(parent, child)
+            .with_local_anchor1(Vec2::new(0.0, -50.0))
+            .with_local_anchor2(Vec2::new(0.0, 50.0)),
+    ));
 }
 
 #[cfg(test)]
