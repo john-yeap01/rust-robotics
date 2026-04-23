@@ -10,10 +10,11 @@ const EARTH_GRAVITY_MPS2: f32 = 9.81;
 const SCALED_GRAVITY: f32 = EARTH_GRAVITY_MPS2 * PIXELS_PER_METER;
 const GROUND_HALF_WIDTH: f32 = 500.0;
 const GROUND_HALF_HEIGHT: f32 = 50.0;
-const GROUND_Y: f32 = -100.0;
-const DEFAULT_ROBOT_START: Vec2 = Vec2::new(0.0, 400.0);
-const BASE_LINK_POS: Vec2 = Vec2::new(0.0, 0.0);
-const CHILD_LINK_POS: Vec2 = Vec2::new(0.0, -100.0);
+const HEIGHT_OFFSET: f32 = -30.0;
+const GROUND_Y: f32 = -100.0+HEIGHT_OFFSET;
+const DEFAULT_ROBOT_START: Vec2 = Vec2::new(15.0, 400.0);
+const BASE_LINK_POS: Vec2 = Vec2::new(0.0, 0.0+HEIGHT_OFFSET);
+const CHILD_LINK_POS: Vec2 = Vec2::new(0.0, 120.0+HEIGHT_OFFSET);
 
 pub fn build_app() -> App {
     let mut app = App::new();

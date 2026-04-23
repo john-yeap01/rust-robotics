@@ -10,6 +10,9 @@ pub struct Link;
 #[derive(Component, Debug, Default)]
 pub struct Joint;
 
+const LINK_HALF_HEIGHT: f32 = 50.0;
+const HUB_RADIUS: f32 = 10.0;
+
 pub fn spawn_default_robot(commands: &mut Commands, position: Vec2) -> Entity {
     commands
         .spawn((
@@ -32,6 +35,13 @@ pub fn add_link(commands: &mut Commands, position: Vec2, is_base: bool) -> Entit
                 Restitution::ZERO,
                 Transform::from_xyz(position.x, position.y, 0.0),
             ))
+            .with_children(|children| {
+                children.spawn((
+                    Joint,
+                    Collider::circle(HUB_RADIUS),
+                    Transform::from_xyz(0.0, LINK_HALF_HEIGHT + HUB_RADIUS, 0.0),
+                ));
+            })
             .id()
     } else {
         commands
@@ -48,12 +58,13 @@ pub fn add_link(commands: &mut Commands, position: Vec2, is_base: bool) -> Entit
 
 pub fn attach_link(commands: &mut Commands, parent: Entity, child: Entity) {
     commands.spawn((
-        Joint,
         RevoluteJoint::new(parent, child)
-            .with_local_anchor1(Vec2::new(0.0, -50.0))
-            .with_local_anchor2(Vec2::new(0.0, 50.0)),
+            .with_local_anchor1(Vec2::new(0.0, LINK_HALF_HEIGHT + HUB_RADIUS))
+            .with_local_anchor2(Vec2::new(0.0, -(LINK_HALF_HEIGHT + HUB_RADIUS))),
+        JointCollisionDisabled,
     ));
 }
+
 
 #[cfg(test)]
 mod tests {
