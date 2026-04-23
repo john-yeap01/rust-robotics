@@ -1,37 +1,44 @@
-use avian2d::prelude::*;
 use bevy::prelude::*;
+use bevy_rapier2d::prelude::*;
 
 #[cfg(feature = "debug_visuals")]
-use avian2d::debug_render::PhysicsDebugPlugin;
+use bevy_rapier2d::render::RapierDebugRenderPlugin;
 
-use crate::robot::{add_link, attach_link, spawn_default_robot};
+use crate::control::ControlPlugin;
+use crate::robot::{add_link, attach_base_to_hub, attach_link_to_hub, spawn_joint_hub};
+
 const PIXELS_PER_METER: f32 = 100.0;
-const EARTH_GRAVITY_MPS2: f32 = 9.81;
-const SCALED_GRAVITY: f32 = EARTH_GRAVITY_MPS2 * PIXELS_PER_METER;
 const GROUND_HALF_WIDTH: f32 = 500.0;
 const GROUND_HALF_HEIGHT: f32 = 50.0;
 const HEIGHT_OFFSET: f32 = -30.0;
-const GROUND_Y: f32 = -100.0+HEIGHT_OFFSET;
-const DEFAULT_ROBOT_START: Vec2 = Vec2::new(15.0, 400.0);
-const BASE_LINK_POS: Vec2 = Vec2::new(0.0, 0.0+HEIGHT_OFFSET);
-const CHILD_LINK_POS: Vec2 = Vec2::new(0.0, 120.0+HEIGHT_OFFSET);
+const GROUND_Y: f32 = -100.0 + HEIGHT_OFFSET;
+const BASE_LINK_POS: Vec2 = Vec2::new(0.0, 0.0 + HEIGHT_OFFSET);
+const LINK_HALF_HEIGHT: f32 = 50.0;
+const HUB_RADIUS: f32 = 5.0;
+const HUB_POS: Vec2 = Vec2::new(0.0, BASE_LINK_POS.y + LINK_HALF_HEIGHT + HUB_RADIUS);
+const CHILD_LINK_POS: Vec2 = Vec2::new(0.0, HUB_POS.y + HUB_RADIUS + LINK_HALF_HEIGHT);
 
 pub fn build_app() -> App {
     let mut app = App::new();
 
-    app.add_plugins(DefaultPlugins);
+    app.add_plugins((DefaultPlugins, ControlPlugin));
     configure_simulation(&mut app);
 
     app
 }
 
 fn configure_simulation(app: &mut App) {
-    app.add_plugins(PhysicsPlugins::default())
-        .insert_resource(Gravity(Vec2::new(0.0, -SCALED_GRAVITY)))
-        .add_systems(Startup, setup_simulation);
+    app.add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(
+        PIXELS_PER_METER,
+    ))
+    .insert_resource(TimestepMode::Fixed {
+        dt: 1.0 / 60.0,
+        substeps: 12,
+    })
+    .add_systems(Startup, setup_simulation);
 
     #[cfg(feature = "debug_visuals")]
-    app.add_plugins(PhysicsDebugPlugin::default())
+    app.add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Update, log_rigid_body_positions);
 }
 
@@ -39,16 +46,29 @@ fn setup_simulation(mut commands: Commands) {
     commands.spawn(Camera2d);
 
     commands.spawn((
-        RigidBody::Static,
-        Collider::rectangle(GROUND_HALF_WIDTH * 2.0, GROUND_HALF_HEIGHT * 2.0),
-        Restitution::ZERO,
+        RigidBody::Fixed,
+        Collider::cuboid(GROUND_HALF_WIDTH, GROUND_HALF_HEIGHT),
+        Restitution::coefficient(0.0),
         Transform::from_xyz(0.0, GROUND_Y, 0.0),
     ));
 
-    spawn_default_robot(&mut commands, DEFAULT_ROBOT_START);
     let base = add_link(&mut commands, BASE_LINK_POS, true);
     let child = add_link(&mut commands, CHILD_LINK_POS, false);
-    attach_link(&mut commands, base, child);
+    let hub = spawn_joint_hub(&mut commands, HUB_POS, HUB_RADIUS);
+    attach_base_to_hub(
+        &mut commands,
+        base,
+        hub,
+        Vec2::new(0.0, LINK_HALF_HEIGHT),
+        Vec2::new(0.0, -HUB_RADIUS),
+    );
+    attach_link_to_hub(
+        &mut commands,
+        child,
+        hub,
+        Vec2::new(0.0, -LINK_HALF_HEIGHT),
+        Vec2::new(0.0, HUB_RADIUS),
+    );
 }
 
 #[cfg(feature = "debug_visuals")]
@@ -61,22 +81,15 @@ fn log_rigid_body_positions(positions: Query<&Transform, With<RigidBody>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::robot::Robot;
-
-    fn build_headless_app() -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.add_systems(Startup, setup_simulation);
-        app
-    }
+    use crate::control::JointTarget;
 
     #[test]
-    fn build_app_includes_simulation_entities_after_startup() {
-        let mut app = build_headless_app();
-        app.update();
+    fn configure_simulation_adds_core_resources() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, ControlPlugin));
+        configure_simulation(&mut app);
 
-        let mut robot_query = app.world_mut().query::<&Robot>();
-        let robot_count = robot_query.iter(app.world()).count();
-        assert_eq!(robot_count, 1);
+        assert!(app.world().contains_resource::<JointTarget>());
+        assert!(app.world().contains_resource::<TimestepMode>());
     }
 }

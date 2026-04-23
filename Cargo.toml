@@ -10,3 +10,4 @@ debug_visuals = []
 [dependencies]
 bevy = "0.18.1"
 avian2d = "0.6"
+bevy_rapier2d = "0.33.0"

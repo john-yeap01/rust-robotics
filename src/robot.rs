@@ -1,5 +1,7 @@
-use avian2d::prelude::*;
 use bevy::prelude::*;
+use bevy_rapier2d::prelude::*;
+
+use crate::control::ActuatedJoint;
 
 #[derive(Component, Debug, Default)]
 pub struct Robot;
@@ -10,16 +12,15 @@ pub struct Link;
 #[derive(Component, Debug, Default)]
 pub struct Joint;
 
-const LINK_HALF_HEIGHT: f32 = 50.0;
-const HUB_RADIUS: f32 = 10.0;
+const CHILD_START_ANGLE_RADIANS: f32 = 0.2;
 
 pub fn spawn_default_robot(commands: &mut Commands, position: Vec2) -> Entity {
     commands
         .spawn((
             Robot,
             RigidBody::Dynamic,
-            Collider::circle(50.0),
-            Restitution::new(0.8),
+            Collider::ball(50.0),
+            Restitution::coefficient(0.8),
             Transform::from_xyz(position.x, position.y, 0.0),
         ))
         .id()
@@ -30,41 +31,70 @@ pub fn add_link(commands: &mut Commands, position: Vec2, is_base: bool) -> Entit
         commands
             .spawn((
                 Link,
-                RigidBody::Static,
-                Collider::rectangle(20.0, 100.0),
-                Restitution::ZERO,
+                RigidBody::Fixed,
+                Collider::cuboid(10.0, 50.0),
+                Restitution::coefficient(0.0),
                 Transform::from_xyz(position.x, position.y, 0.0),
             ))
-            .with_children(|children| {
-                children.spawn((
-                    Joint,
-                    Collider::circle(HUB_RADIUS),
-                    Transform::from_xyz(0.0, LINK_HALF_HEIGHT + HUB_RADIUS, 0.0),
-                ));
-            })
             .id()
     } else {
         commands
             .spawn((
                 Link,
                 RigidBody::Dynamic,
-                Collider::rectangle(20.0, 100.0),
-                Restitution::ZERO,
-                Transform::from_xyz(position.x, position.y, 0.0),
+                Collider::cuboid(10.0, 50.0),
+                Restitution::coefficient(0.0),
+                Transform::from_xyz(position.x, position.y, 0.0)
+                    .with_rotation(Quat::from_rotation_z(CHILD_START_ANGLE_RADIANS)),
             ))
             .id()
     }
 }
 
-pub fn attach_link(commands: &mut Commands, parent: Entity, child: Entity) {
-    commands.spawn((
-        RevoluteJoint::new(parent, child)
-            .with_local_anchor1(Vec2::new(0.0, LINK_HALF_HEIGHT + HUB_RADIUS))
-            .with_local_anchor2(Vec2::new(0.0, -(LINK_HALF_HEIGHT + HUB_RADIUS))),
-        JointCollisionDisabled,
-    ));
+pub fn spawn_joint_hub(commands: &mut Commands, position: Vec2, radius: f32) -> Entity {
+    commands
+        .spawn((
+            Joint,
+            RigidBody::Dynamic,
+            Collider::ball(radius),
+            Restitution::coefficient(0.0),
+            Transform::from_xyz(position.x, position.y, 0.0),
+        ))
+        .id()
 }
 
+pub fn attach_base_to_hub(
+    commands: &mut Commands,
+    base: Entity,
+    hub: Entity,
+    base_anchor: Vec2,
+    hub_anchor: Vec2,
+) {
+    let joint = FixedJointBuilder::new()
+        .local_anchor1(base_anchor)
+        .local_anchor2(hub_anchor);
+
+    commands.entity(hub).insert(ImpulseJoint::new(base, joint));
+}
+
+pub fn attach_link_to_hub(
+    commands: &mut Commands,
+    child: Entity,
+    hub: Entity,
+    child_anchor: Vec2,
+    hub_anchor: Vec2,
+) {
+    let joint = RevoluteJointBuilder::new()
+        .local_anchor1(hub_anchor)
+        .local_anchor2(child_anchor)
+        .motor_model(MotorModel::AccelerationBased)
+        .motor_position(2.0, 80.0, 12.0)
+        .motor_max_force(500.0);
+
+    commands
+        .entity(child)
+        .insert((ActuatedJoint, ImpulseJoint::new(hub, joint)));
+}
 
 #[cfg(test)]
 mod tests {
